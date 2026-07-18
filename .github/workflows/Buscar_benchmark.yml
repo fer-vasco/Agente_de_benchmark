@@ -32,4 +32,4 @@ jobs:
         CHAT_ID: ${{ secrets.CHAT_ID }}
         CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         
-      run: Consultas_de_Claude.py
+      run: python Consultas_de_Claude.py
