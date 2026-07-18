@@ -1,4 +1,3 @@
-asyncio
 claude_agent_sdk
-dotenv
+python-dotenv
 requests
