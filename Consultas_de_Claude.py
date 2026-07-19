@@ -3,6 +3,11 @@ from claude_agent_sdk import query, ClaudeAgentOptions, AssistantMessage, TextBl
 import os
 from dotenv import load_dotenv
 import requests
+import time
+
+# Estos imports son para el registro de los reportes ya generados
+import pandas as pd
+from pathlib import Path
 
 
 def Enviar_mensaje(mensaje, bot_token, chat_id):
@@ -13,26 +18,55 @@ def Enviar_mensaje(mensaje, bot_token, chat_id):
     return response.status_code
 
 
-async def main(bot_token, chat_id):
+async def main(bot_token, chat_id, archivo):
+
+    casos_previos = Leer_casos(archivo)
+
+    mi_prompt= (
+        "Buscá en internet un caso sobre mejora logística inbound automotriz."
+        "Priorizá casos reales de procesos inbound solamente, de las automtrices más importantes del mundo."
+        "Armá un resumen de los logros, las estrategias implementadas, las soluciones eficientes y los problemas resueltos."
+        "Explicá lo que hicieron haciendo foco en los puntos fundamentales que permitieron coneguir el logro y mejora."
+        "No generes ningún caso complementario."
+        "Respondé SOLO con esa línea, sin introducción ni comentarios."
+        )
+
+    if casos_previos:
+        lista = "\n".join(f"- {c}" for c in casos_previos)
+        prompt += (
+            "\n\nIMPORTANTE: ya generé reportes sobre los siguientes casos. "
+            "NO repitas ninguno de ellos; buscá un caso distinto (otra empresa, "
+            "u otro proceso/proyecto si es la misma empresa):\n" + lista
+        )
+
+
+    mensaje = ""
     async for m in query(
-        prompt="Buscá en internet un caso sobre mejora logística inbound automotriz. Prioricá casos reales de procesos inbound solamente, de las automtrices más importantes del mundo. Armá un resumen de los logros, las estrategias implementadas, las soluciones eficientes y los problemas resueltos. Explicá lo que hicieron haciendo foco en los puntos fundamentales que permitieron coneguir el logro y mejora.",
+        prompt=mi_prompt,
         options=ClaudeAgentOptions(allowed_tools=["WebSearch"]),
     ):
         if isinstance(m, AssistantMessage):
             for b in m.content:
                 if isinstance(b, TextBlock):
-                    mensaje = b.text
-                    print(mensaje)
+                    mensaje += b.text + "\n"
 
-                    lista_de_submensajes = Dividir_mensaje(mensaje)
-                    for submensaje in lista_de_submensajes:
-                        Enviar_mensaje(submensaje, bot_token, chat_id)
+
+    print(mensaje)
+
+    lista_de_submensajes = Dividir_mensaje(mensaje)
+    for submensaje in lista_de_submensajes:
+        Enviar_mensaje(submensaje, bot_token, chat_id)
+        time.sleep(1) # Telegram solo permite 1 mensaje por segundo a un mismo chat
+
+    descripcion = await Registrar_caso(mensaje, archivo)
+    print(f"Caso registrado: {descripcion}")
+
 
 
 
 def Dividir_mensaje(mensaje, max_largo=4000):
-    """Divide un texto en partes de hasta max_largo caracteres,
-    cortando en saltos de línea o espacios para no partir palabras."""
+    # Divide un texto en partes de hasta max_largo caracteres,
+    # cortando en saltos de línea o espacios para no partir palabras.
     partes = []
     while mensaje:
         if len(mensaje) <= max_largo:
@@ -50,13 +84,65 @@ def Dividir_mensaje(mensaje, max_largo=4000):
 
 
 
+
+
+
+
+
+async def Generar_descripcion(reporte):
+    # Genera una descripción breve del caso a partir del reporte completo.
+    prompt = (
+        "A continuación te paso un reporte de un caso de mejora logística. "
+        "Generá una descripción de UNA sola línea (máximo 30 palabras) que identifique "
+        "inequívocamente el caso: empresa, proceso mejorado y logro principal. "
+        "Respondé SOLO con esa línea, sin introducción ni comentarios.\n\n"
+        f"REPORTE:\n{reporte}"
+    )
+    descripcion = ""
+    async for m in query(prompt=prompt, options=ClaudeAgentOptions(allowed_tools=[])):
+        if isinstance(m, AssistantMessage):
+            for b in m.content:
+                if isinstance(b, TextBlock):
+                    descripcion += b.text
+    return descripcion.strip()
+
+
+def Actualizar_casos(descripcion, archivo):
+    # Agrega la descripción como nueva fila en la columna 'caso' del csv.
+    if Path(archivo).exists():
+        df = pd.read_csv(archivo)
+    else:
+        df = pd.DataFrame(columns=["caso"])
+    df = pd.concat([df, pd.DataFrame({"caso": [descripcion]})], ignore_index=True)
+    df.to_csv(archivo, index=False)
+    return df
+
+
+async def Registrar_caso(reporte, archivo):
+    # Función principal: recibe el reporte, genera la descripción y actualiza el csv.
+    descripcion = await Generar_descripcion(reporte)
+    Actualizar_casos(descripcion, archivo)
+    return descripcion
+
+
+
+
+def Leer_casos(archivo):
+    # Devuelve la lista de casos ya reportados (vacía si no existe el archivo).
+    if Path(archivo).exists():
+        return pd.read_csv(archivo)["caso"].tolist()
+    return []
+
+
+
 # Inicio del programa
 # ===================
 
 load_dotenv()
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
 CHAT_ID = os.environ.get('CHAT_ID')
-asyncio.run(main(BOT_TOKEN, CHAT_ID))
+ARCHIVO_CASOS = "casos_reportados.csv"
+asyncio.run(main(BOT_TOKEN, CHAT_ID, ARCHIVO_CASOS))
 
 
 
