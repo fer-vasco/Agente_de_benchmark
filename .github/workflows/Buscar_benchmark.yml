@@ -33,3 +33,16 @@ jobs:
         CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         
       run: python Consultas_de_Claude.py
+
+    - name: Install dependencies (if needed)
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Commit parquet actualizado
+      run: |
+        git config user.name "github-actions"
+        git config user.email "fer-vasco[bot]@users.noreply.github.com"
+        git add casos_reportados.csv
+        git diff --cached --quiet || git commit -m "Actualizar casos reportados" || echo "No changes to commit"
+        git push || echo "Nothing to push"
