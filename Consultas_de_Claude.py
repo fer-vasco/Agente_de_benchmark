@@ -33,7 +33,7 @@ async def main(bot_token, chat_id, archivo):
 
     if casos_previos:
         lista = "\n".join(f"- {c}" for c in casos_previos)
-        prompt += (
+        mi_prompt += (
             "\n\nIMPORTANTE: ya generé reportes sobre los siguientes casos. "
             "NO repitas ninguno de ellos; buscá un caso distinto (otra empresa, "
             "u otro proceso/proyecto si es la misma empresa):\n" + lista
