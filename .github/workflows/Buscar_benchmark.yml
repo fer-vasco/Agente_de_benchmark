@@ -3,7 +3,7 @@ name: Buscar_benchmark
 on:
   schedule:
     # Todos los días a las 11:45 hora Argentina (14:45 UTC)
-    - cron: '45 14 * * *'
+    # - cron: '45 14 * * *'
   workflow_dispatch:
 
 jobs:
